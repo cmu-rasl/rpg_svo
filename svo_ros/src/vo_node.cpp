@@ -23,6 +23,7 @@
 #include <vikit/params_helper.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/Imu.h>
+#include <sensor_msgs/Range.h>
 #include <std_msgs/String.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
@@ -40,13 +41,14 @@ namespace svo {
 /// SVO Interface
 class VoNode
 {
+  float range_;
 public:
   svo::FrameHandlerMono* vo_;
   svo::Visualizer visualizer_;
   bool publish_markers_;                 //!< publish only the minimal amount of info (choice for embedded devices)
   bool publish_dense_input_;
   boost::shared_ptr<vk::UserInputThread> user_input_thread_;
-  ros::Subscriber sub_remote_key_;
+  ros::Subscriber sub_remote_key_, sub_range_;
   std::string remote_input_;
   vk::AbstractCamera* cam_;
   bool quit_;
@@ -55,6 +57,7 @@ public:
   void imgCb(const sensor_msgs::ImageConstPtr& msg);
   void processUserActions();
   void remoteKeyCb(const std_msgs::StringConstPtr& key_input);
+  void rangeCb(const sensor_msgs::RangeConstPtr& msg);
 };
 
 VoNode::VoNode() :
@@ -63,7 +66,8 @@ VoNode::VoNode() :
   publish_dense_input_(vk::getParam<bool>("svo/publish_dense_input", false)),
   remote_input_(""),
   cam_(NULL),
-  quit_(false)
+  quit_(false),
+  range_(0.0)
 {
   // Start user input thread in parallel thread that listens to console keys
   if(vk::getParam<bool>("svo/accept_console_user_input", true))
@@ -117,6 +121,12 @@ void VoNode::imgCb(const sensor_msgs::ImageConstPtr& msg)
     usleep(100000);
 }
 
+void VoNode::rangeCb(const sensor_msgs::RangeConstPtr &msg){
+  // Acquire the current range of the ground plane, and set that to be the scale param
+  range_ = msg->range;
+  Config::mapScale() = range_;
+}
+
 void VoNode::processUserActions()
 {
   char input = remote_input_.c_str()[0];
@@ -168,7 +178,10 @@ int main(int argc, char **argv)
 
   // subscribe to remote input
   vo_node.sub_remote_key_ = nh.subscribe("svo/remote_key", 5, &svo::VoNode::remoteKeyCb, &vo_node);
-
+  
+  // subscribe to range topic
+  std::string range_topic(vk::getParam<std::string>("svo/range_topic", "/range"));
+  vo_node.sub_range_ = nh.subscribe(range_topic, 1, &svo::VoNode::rangeCb, &vo_node);
   // start processing callbacks
   while(ros::ok() && !vo_node.quit_)
   {
