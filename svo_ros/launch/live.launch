@@ -1,16 +1,22 @@
 <launch>
-  
+
     <node pkg="svo_ros" type="vo" name="svo" clear_params="true" output="screen">
-    
+
         <!-- Camera topic to subscribe to -->
-        <param name="cam_topic" value="/camera/image_raw" type="str" />
-        
+        <param name="cam_topic" value="/mv_25001509/image_raw" type="str" />
+
         <!-- Camera calibration file -->
         <rosparam file="$(find svo_ros)/param/camera_atan.yaml" />
-        
+
         <!-- Default parameter settings: choose between vo_fast and vo_accurate -->
-        <rosparam file="$(find svo_ros)/param/vo_fast.yaml" />
+        <rosparam file="$(find svo_ros)/param/vo_accurate.yaml" />
+
+        <param name="range_topic" value="/range" type="str"/>
+        <param name="gt_topic" value="/vicon/danaus18/danaus18"/>
+        <param name="publish_world_in_cam_frame" value="false"/>
+        <param name="init_ry" value="3.14"/>
+        <param name="init_rz" value="-1.57"/>
 
     </node>
-        
+
 </launch>
