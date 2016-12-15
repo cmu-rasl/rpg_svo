@@ -45,6 +45,11 @@ typedef boost::shared_ptr<Frame> FramePtr;
 /// This class bundles all functions to publish visualisation messages.
 class Visualizer
 {
+private:
+  SE3 T_gt_;
+  SE3 T_gt_first_;
+  SE3 T_gt_init_;
+  bool is_initialized_, is_in_first_stage_;
 public:
   ros::NodeHandle pnh_;
   size_t trace_id_;
@@ -56,6 +61,7 @@ public:
   ros::Publisher pub_pose_;
   ros::Publisher pub_info_;
   ros::Publisher pub_dense_;
+  ros::Subscriber sub_gt_;
   image_transport::Publisher pub_images_;
   tf::TransformBroadcaster br_;
   bool publish_world_in_cam_frame_;
@@ -85,6 +91,8 @@ public:
   void displayKeyframeWithMps(const FramePtr& frame, int ts);
 
   void exportToDense(const FramePtr& frame);
+
+  void gtCb(const geometry_msgs::TransformStampedConstPtr &msg);
 };
 
 } // end namespace svo

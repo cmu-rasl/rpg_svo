@@ -22,6 +22,7 @@
 #include <svo/feature.h>
 #include <svo_msgs/Info.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <geometry_msgs/TransformStamped.h>
 #include <sensor_msgs/image_encodings.h>
 #include <cv_bridge/cv_bridge.h>
 #include <tf/tf.h>
@@ -47,7 +48,8 @@ Visualizer() :
     publish_world_in_cam_frame_(vk::getParam<bool>("svo/publish_world_in_cam_frame", true)),
     publish_map_every_frame_(vk::getParam<bool>("svo/publish_map_every_frame", false)),
     publish_points_display_time_(vk::getParam<double>("svo/publish_point_display_time", 0)),
-    T_world_from_vision_(Matrix3d::Identity(), Vector3d::Zero())
+    T_world_from_vision_(Matrix3d::Identity(), Vector3d::Zero()),
+    is_initialized_(false)
 {
   // Init ROS Marker Publishers
   pub_frames_ = pnh_.advertise<visualization_msgs::Marker>("keyframes", 10);
@@ -55,6 +57,10 @@ Visualizer() :
   pub_pose_ = pnh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("pose",10);
   pub_info_ = pnh_.advertise<svo_msgs::Info>("info", 10);
   pub_dense_ = pnh_.advertise<svo_msgs::DenseInput>("dense_input",10);
+
+  // Init ROS subscriber
+  std::string ground_truth_topic(vk::getParam<std::string>("svo/gt_topic", "svo/gt"));
+  sub_gt_ = pnh_.subscribe(ground_truth_topic, 1, &svo::Visualizer::gtCb, this);
 
   // create video publisher
   image_transport::ImageTransport it(pnh_);
@@ -102,8 +108,15 @@ void Visualizer::publishMinimal(
       img_msg.image = img;
       img_msg.encoding = sensor_msgs::image_encodings::MONO8;
       pub_images_.publish(img_msg.toImageMsg());
+      is_in_first_stage_ = true;
     }
     return;
+  }
+
+  // If we've just transitioned to the second stage
+  if(slam.stage() == FrameHandlerBase::STAGE_SECOND_FRAME && is_in_first_stage_ == true){
+    T_gt_init_ = T_gt_;
+    is_in_first_stage_ = false;
   }
 
   // Publish pyramid-image every nth-frame.
@@ -115,6 +128,7 @@ void Visualizer::publishMinimal(
 
     if(slam.stage() == FrameHandlerBase::STAGE_SECOND_FRAME)
     {
+      is_initialized_ = false;
       // During initialization, draw lines.
       const vector<cv::Point2f>& px_ref(slam.initFeatureTrackRefPx());
       const vector<cv::Point2f>& px_cur(slam.initFeatureTrackCurPx());
@@ -161,6 +175,11 @@ void Visualizer::publishMinimal(
     pub_images_.publish(img_msg.toImageMsg());
   }
 
+  if(!is_initialized_ && slam.stage() == FrameHandlerBase::STAGE_DEFAULT_FRAME){
+    is_initialized_ = true;
+    std::cout<<"\nSETTING THE FIRST FRAME!\n";
+    T_gt_first_ = T_gt_init_;
+  }
   if(pub_pose_.getNumSubscribers() > 0 && slam.stage() == FrameHandlerBase::STAGE_DEFAULT_FRAME)
   {
     Quaterniond q;
@@ -169,7 +188,7 @@ void Visualizer::publishMinimal(
     if(publish_world_in_cam_frame_)
     {
       // publish world in cam frame
-      SE3 T_cam_from_world(frame->T_f_w_* T_world_from_vision_);
+      SE3 T_cam_from_world(frame->T_f_w_* T_world_from_vision_.inverse());
       q = Quaterniond(T_cam_from_world.rotation_matrix());
       p = T_cam_from_world.translation();
       Cov = frame->Cov_;
@@ -204,10 +223,17 @@ void Visualizer::visualizeMarkers(
 {
   if(frame == NULL)
     return;
-
-  vk::output_helper::publishTfTransform(
-      frame->T_f_w_*T_world_from_vision_.inverse(),
-      ros::Time(frame->timestamp_), "cam_pos", "world", br_);
+  if(publish_world_in_cam_frame_){
+      vk::output_helper::publishTfTransform(
+        frame->T_f_w_*T_world_from_vision_.inverse(),
+        ros::Time(frame->timestamp_), "cam_pos", "world", br_);
+  }
+  else
+  {
+      vk::output_helper::publishTfTransform(
+        T_world_from_vision_*frame->T_f_w_.inverse(),
+        ros::Time(frame->timestamp_), "world", "cam_pos", br_);
+  }
 
   if(pub_frames_.getNumSubscribers() > 0 || pub_points_.getNumSubscribers() > 0)
   {
@@ -311,6 +337,33 @@ void Visualizer::exportToDense(const FramePtr& frame)
     msg.pose.orientation.y = q.y();
     msg.pose.orientation.z = q.z();
     pub_dense_.publish(msg);
+  }
+}
+
+void Visualizer::gtCb(const geometry_msgs::TransformStampedConstPtr &msg){
+  tf::StampedTransform gt_transform;
+  transformStampedMsgToTF(*msg,gt_transform);
+  T_gt_ = Sophus::SE3(
+      Eigen::Quaterniond(msg->transform.rotation.w,
+                        msg->transform.rotation.x,
+                        msg->transform.rotation.y,
+                        msg->transform.rotation.z),
+      Eigen::Vector3d(msg->transform.translation.x,
+                      msg->transform.translation.y,
+                      msg->transform.translation.z));
+  // Also publish delta transform if the tracking is initialized
+  if(is_initialized_){
+    SE3 T_first_curr(T_gt_first_.inverse()*T_gt_);
+    tf::Transform rel_transform;
+    Vector3d pos(T_first_curr.translation());
+    Quaterniond q(T_first_curr.rotation_matrix());
+    rel_transform.setOrigin(tf::Vector3(pos[0], pos[1], pos[2]));
+    rel_transform.setRotation(tf::Quaternion(q.x(), q.y(), q.z(), q.w()));
+
+    br_.sendTransform(tf::StampedTransform(rel_transform, msg->header.stamp, "gt_first", "gt"));
+    rel_transform.setOrigin(tf::Vector3(0,0,0));
+    rel_transform.setRotation(tf::Quaternion(0,0,0,1));
+    br_.sendTransform(tf::StampedTransform(rel_transform, msg->header.stamp, "world", "gt_first"));
   }
 }
 
