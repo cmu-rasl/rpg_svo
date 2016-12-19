@@ -17,7 +17,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 #include <ros/ros.h>
 #include <ros/package.h>
 #include <opencv2/opencv.hpp>
@@ -108,7 +108,7 @@ void BenchmarkNode::tracePoseError(const SE3& T_f_gt, const double timestamp)
   trace_trans_error_ << timestamp << " ";
   trace_trans_error_.precision(6);
   trace_trans_error_ << et.x() << " " << et.y() << " " << et.z() << " " << std::endl;
-  Vector3d er(vk::dcm2rpy(T_f_gt.rotation_matrix())); // rotation error in roll-pitch-yaw
+  Vector3d er(vk::dcm2rpy(T_f_gt.rotationMatrix())); // rotation error in roll-pitch-yaw
   trace_rot_error_.precision(15);
   trace_rot_error_.setf(std::ios::fixed, std::ios::floatfield );
   trace_rot_error_ << timestamp << " ";
@@ -210,7 +210,7 @@ void BenchmarkNode::runBlenderBenchmark(const std::string& dataset_dir)
     cv::Mat depthmap;
     vk::blender_utils::loadBlenderDepthmap(
         dataset_dir+"/depth/"+it->image_name_+"_0.depth", *cam_, depthmap);
-    Sophus::SE3 T_w_gt(it->q_, it->t_);
+    Sophus::SE3d T_w_gt(it->q_, it->t_);
 
     // Set reference frame with depth
     if(frame_count_ == 0)
@@ -248,7 +248,7 @@ void BenchmarkNode::runBlenderBenchmark(const std::string& dataset_dir)
     }
 
     // Compute pose error and trace to file
-    Sophus::SE3 T_f_gt(vo_->lastFrame()->T_f_w_*T_w_gt);
+    Sophus::SE3d T_f_gt(vo_->lastFrame()->T_f_w_*T_w_gt);
     tracePoseError(T_f_gt, it->timestamp_);
     tracePose(vo_->lastFrame()->T_f_w_.inverse(), it->timestamp_);
     traceDepthError(vo_->lastFrame(), depthmap);

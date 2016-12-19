@@ -86,7 +86,7 @@ void Visualizer::publishMinimal(
     msg_info.header = header_msg;
     msg_info.processing_time = slam.lastProcessingTime();
     msg_info.keyframes.reserve(slam.map().keyframes_.size());
-    for(list<FramePtr>::const_iterator it=slam.map().keyframes_.begin(); it!=slam.map().keyframes_.end(); ++it)
+    for(std::list<FramePtr>::const_iterator it=slam.map().keyframes_.begin(); it!=slam.map().keyframes_.end(); ++it)
       msg_info.keyframes.push_back((*it)->id_);
     msg_info.stage = static_cast<int>(slam.stage());
     msg_info.tracking_quality = static_cast<int>(slam.trackingQuality());
@@ -130,9 +130,9 @@ void Visualizer::publishMinimal(
     {
       is_initialized_ = false;
       // During initialization, draw lines.
-      const vector<cv::Point2f>& px_ref(slam.initFeatureTrackRefPx());
-      const vector<cv::Point2f>& px_cur(slam.initFeatureTrackCurPx());
-      for(vector<cv::Point2f>::const_iterator it_ref=px_ref.begin(), it_cur=px_cur.begin();
+      const std::vector<cv::Point2f>& px_ref(slam.initFeatureTrackRefPx());
+      const std::vector<cv::Point2f>& px_cur(slam.initFeatureTrackCurPx());
+      for(std::vector<cv::Point2f>::const_iterator it_ref=px_ref.begin(), it_cur=px_cur.begin();
           it_ref != px_ref.end(); ++it_ref, ++it_cur)
         cv::line(img_rgb,
                  cv::Point2f(it_cur->x/scale, it_cur->y/scale),
@@ -189,7 +189,7 @@ void Visualizer::publishMinimal(
     {
       // publish world in cam frame
       SE3 T_cam_from_world(frame->T_f_w_* T_world_from_vision_.inverse());
-      q = Quaterniond(T_cam_from_world.rotation_matrix());
+      q = Quaterniond(T_cam_from_world.rotationMatrix());
       p = T_cam_from_world.translation();
       Cov = frame->Cov_;
     }
@@ -197,7 +197,7 @@ void Visualizer::publishMinimal(
     {
       // publish cam in world frame
       SE3 T_world_from_cam(T_world_from_vision_*frame->T_f_w_.inverse());
-      q = Quaterniond(T_world_from_cam.rotation_matrix()*T_world_from_vision_.rotation_matrix().transpose());
+      q = Quaterniond(T_world_from_cam.rotationMatrix()*T_world_from_vision_.rotationMatrix().transpose());
       p = T_world_from_cam.translation();
       Cov = T_world_from_cam.Adj()*frame->Cov_*T_world_from_cam.inverse().Adj();
     }
@@ -218,7 +218,7 @@ void Visualizer::publishMinimal(
 
 void Visualizer::visualizeMarkers(
     const FramePtr& frame,
-    const set<FramePtr>& core_kfs,
+    const std::set<FramePtr>& core_kfs,
     const Map& map)
 {
   if(frame == NULL)
@@ -249,12 +249,12 @@ void Visualizer::visualizeMarkers(
   }
 }
 
-void Visualizer::publishMapRegion(set<FramePtr> frames)
+void Visualizer::publishMapRegion(std::set<FramePtr> frames)
 {
   if(pub_points_.getNumSubscribers() > 0)
   {
     int ts = vk::Timer::getCurrentTime();
-    for(set<FramePtr>::iterator it=frames.begin(); it!=frames.end(); ++it)
+    for(std::set<FramePtr>::iterator it=frames.begin(); it!=frames.end(); ++it)
       displayKeyframeWithMps(*it, ts);
   }
 }
@@ -263,7 +263,7 @@ void Visualizer::removeDeletedPts(const Map& map)
 {
   if(pub_points_.getNumSubscribers() > 0)
   {
-    for(list<Point*>::const_iterator it=map.trash_points_.begin(); it!=map.trash_points_.end(); ++it)
+    for(std::list<Point*>::const_iterator it=map.trash_points_.begin(); it!=map.trash_points_.end(); ++it)
       vk::output_helper::publishPointMarker(pub_points_, Vector3d(), "pts", ros::Time::now(), (*it)->id_, 2, 0.006, Vector3d());
   }
 }
@@ -273,7 +273,7 @@ void Visualizer::displayKeyframeWithMps(const FramePtr& frame, int ts)
   // publish keyframe
   SE3 T_world_cam(T_world_from_vision_*frame->T_f_w_.inverse());
   vk::output_helper::publishFrameMarker(
-      pub_frames_, T_world_cam.rotation_matrix(),
+      pub_frames_, T_world_cam.rotationMatrix(),
       T_world_cam.translation(), "kfs", ros::Time::now(), frame->id_*10, 0, 0.015);
 
   // publish point cloud and links
@@ -326,7 +326,7 @@ void Visualizer::exportToDense(const FramePtr& frame)
 
     // publish cam in world frame
     SE3 T_world_from_cam(T_world_from_vision_*frame->T_f_w_.inverse());
-    Quaterniond q(T_world_from_cam.rotation_matrix());
+    Quaterniond q(T_world_from_cam.rotationMatrix());
     Vector3d p(T_world_from_cam.translation());
 
     msg.pose.position.x = p[0];
@@ -343,7 +343,7 @@ void Visualizer::exportToDense(const FramePtr& frame)
 void Visualizer::gtCb(const geometry_msgs::TransformStampedConstPtr &msg){
   tf::StampedTransform gt_transform;
   transformStampedMsgToTF(*msg,gt_transform);
-  T_gt_ = Sophus::SE3(
+  T_gt_ = Sophus::SE3d(
       Eigen::Quaterniond(msg->transform.rotation.w,
                         msg->transform.rotation.x,
                         msg->transform.rotation.y,
@@ -356,7 +356,7 @@ void Visualizer::gtCb(const geometry_msgs::TransformStampedConstPtr &msg){
     SE3 T_first_curr(T_gt_first_.inverse()*T_gt_);
     tf::Transform rel_transform;
     Vector3d pos(T_first_curr.translation());
-    Quaterniond q(T_first_curr.rotation_matrix());
+    Quaterniond q(T_first_curr.rotationMatrix());
     rel_transform.setOrigin(tf::Vector3(pos[0], pos[1], pos[2]));
     rel_transform.setRotation(tf::Quaternion(q.x(), q.y(), q.z(), q.w()));
 

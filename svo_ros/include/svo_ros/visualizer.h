@@ -81,10 +81,10 @@ public:
 
   void visualizeMarkers(
       const FramePtr& frame,
-      const set<FramePtr>& core_kfs,
+      const std::set<FramePtr>& core_kfs,
       const Map& map);
 
-  void publishMapRegion(set<FramePtr> frames);
+  void publishMapRegion(std::set<FramePtr> frames);
 
   void removeDeletedPts(const Map& map);
 

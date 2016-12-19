@@ -25,8 +25,9 @@
 #include <math.h>
 
 #include <Eigen/Core>
+#include <Eigen/Dense>
 #include <opencv2/opencv.hpp>
-#include <sophus/se3.h>
+#include <sophus/se3.hpp>
 #include <vikit/performance_monitor.h>
 #include <boost/shared_ptr.hpp>
 
@@ -90,6 +91,8 @@ namespace svo
 
   class Frame;
   typedef boost::shared_ptr<Frame> FramePtr;
+  typedef typename Sophus::SE3d SE3;
 } // namespace svo
+typedef typename Sophus::SE3d SE3;
 
 #endif // SVO_GLOBAL_H_
