@@ -77,7 +77,8 @@ public:
       const cv::Mat& img,
       const FramePtr& frame,
       const FrameHandlerMono& slam,
-      const double timestamp);
+      const double timestamp,
+      const double range=0.0f);
 
   void visualizeMarkers(
       const FramePtr& frame,

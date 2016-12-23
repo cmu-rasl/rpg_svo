@@ -71,7 +71,8 @@ void Visualizer::publishMinimal(
     const cv::Mat& img,
     const FramePtr& frame,
     const FrameHandlerMono& slam,
-    const double timestamp)
+    const double timestamp,
+    const double range)
 {
   ++trace_id_;
   std_msgs::Header header_msg;
@@ -179,6 +180,7 @@ void Visualizer::publishMinimal(
     is_initialized_ = true;
     std::cout<<"\nSETTING THE FIRST FRAME!\n";
     T_gt_first_ = T_gt_init_;
+    T_world_from_vision_.translation() = Vector3d(0.0f, 0.0f, range);
   }
   if(pub_pose_.getNumSubscribers() > 0 && slam.stage() == FrameHandlerBase::STAGE_DEFAULT_FRAME)
   {
